@@ -47,8 +47,7 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def predict_target_position(target)
-    #distance_to_target = RTanque::Heading.delta_between_points(self.position, target.heading, target.position)
-    speed_modifier_based_on_distance = 10
+    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 10
     expected_target_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
     RTanque::Heading.new_between_points(sensors.position, expected_target_position)
   end
