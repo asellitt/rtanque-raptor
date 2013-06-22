@@ -51,7 +51,7 @@ class Raptor < RTanque::Bot::Brain
     command.turret_heading = predict_prey_position
     command.speed = MAX_BOT_SPEED
 
-    command.fire(MAX_FIRE_POWER)
+    command.fire(MAX_FIRE_POWER) unless raptor_in_the_way_of_prey?
   end
 
   def predict_prey_position
@@ -80,7 +80,7 @@ class Raptor < RTanque::Bot::Brain
 
 
   def do_le_tango(reflection)
-    ( reflection.heading + RTanque::Heading.new_from_degrees(90) ) * direction
+    ( reflection.heading + RTanque::Heading.new_from_degrees(90) ) + direction
   end
 
 
@@ -116,7 +116,7 @@ class Raptor < RTanque::Bot::Brain
     @nearby_raptor
   end
 
-  def raptor_in_way_of_prey?
+  def raptor_in_the_way_of_prey?
     sensors.radar.find { |possible_raptor| 
       raptor?(possible_raptor) && in_line_of_fire?(possible_raptor)
     }
