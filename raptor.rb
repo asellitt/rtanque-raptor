@@ -24,6 +24,8 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def tick!
+    puts "rap: #{object_id} tik: #{sensors.ticks} dir: #{@direction}"
+
     @desired_heading ||= nil
     find_nearest_wall
 
@@ -43,7 +45,7 @@ class Raptor < RTanque::Bot::Brain
     if avoid_wall?
       move_away_from_wall
     else
-      heading = RTanque::Heading.new_from_degrees(do_le_tango(@prey))
+      heading = do_le_tango
       command.heading = @prey.distance > 250 ? heading : -heading
     end
 
@@ -79,8 +81,8 @@ class Raptor < RTanque::Bot::Brain
   end
 
 
-  def do_le_tango(reflection)
-    ( reflection.heading + RTanque::Heading.new_from_degrees(90) ) + direction
+  def do_le_tango
+    @prey.heading + RTanque::Heading.new_from_degrees(direction)
   end
 
 
@@ -100,8 +102,8 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def direction
-    at_tick_interval( rand(100)+100 ) { @direction *= -1 }
-
+    interval = rand(50)+100
+    at_tick_interval( interval ) { @direction *= -1 }
     @direction
   end
 
