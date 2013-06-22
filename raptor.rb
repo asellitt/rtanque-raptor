@@ -6,7 +6,6 @@ class Raptor < RTanque::Bot::Brain
   TURRET_FIRE_RANGE = RTanque::Heading::ONE_DEGREE * 5.0
 
   def initialize(whatever)
-    @tick_count_strafe = 0
     @avoid_wall = 0
     @locked_heading = 0
     @direction = 60
@@ -63,12 +62,11 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def direction
-    @tick_count_strafe += 1
-
-    if @tick_count_strafe > rand(100)+100
-      @direction *= -1 
-      @tick_count_strafe = 0
+    pry binding if sensors.radar.any? { |a| a.type == :shell && a.name != NAME }
+    if sensors.ticks % (rand(100)+100) == 0
+      @direction *= -1
     end
+
     @direction
   end
 
