@@ -1,6 +1,7 @@
 require 'pry'
 class Raptor < RTanque::Bot::Brain
   NAME = 'CleverGirl'
+  COLOR = :green
   include RTanque::Bot::BrainHelper
 
   TURRET_FIRE_RANGE = RTanque::Heading::ONE_DEGREE * 5.0
@@ -38,16 +39,23 @@ class Raptor < RTanque::Bot::Brain
     end
 
     command.radar_heading = reflection.heading
-    command.turret_heading = reflection.heading
+    command.turret_heading = predict_target_position(reflection)
     command.speed = MAX_BOT_SPEED
     if (reflection.heading.delta(sensors.turret_heading)).abs < TURRET_FIRE_RANGE
       command.fire(reflection.distance > 200 ? MAX_FIRE_POWER : MIN_FIRE_POWER)
     end
   end
 
+  def predict_target_position(target)
+    #distance_to_target = RTanque::Heading.delta_between_points(self.position, target.heading, target.position)
+    speed_modifier_based_on_distance = 10
+    expected_target_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
+    RTanque::Heading.new_between_points(sensors.position, expected_target_position)
+  end
+
   def seek_lock
-    if sensors.position.on_wall?
-      @desired_heading = sensors.heading - RTanque::Heading.new_from_degrees(120)
+    if avoid_wall?
+      move_away_from_wall
     end
     command.radar_heading = sensors.radar_heading + MAX_RADAR_ROTATION
     command.speed = MAX_BOT_SPEED
@@ -58,11 +66,11 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def get_radar_lock
-    sensors.radar.find { |reflection| reflection.name != NAME } || sensors.radar.first
+    sensors.radar.find { |reflection| reflection.type == :bot && reflection.name != NAME }
   end
 
   def direction
-    pry binding if sensors.radar.any? { |a| a.type == :shell && a.name != NAME }
+    #pry binding if sensors.radar.any? { |a| a.type == :shell && a.name != NAME }
     if sensors.ticks % (rand(100)+100) == 0
       @direction *= -1
     end
