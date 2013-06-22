@@ -2,93 +2,87 @@ require 'pry'
 class Raptor < RTanque::Bot::Brain
   NAME = 'CleverGirl'
   COLOR = :green
-  include RTanque::Bot::BrainHelper
 
-  TURRET_FIRE_RANGE = RTanque::Heading::ONE_DEGREE * 5.0
+  GO_UP = RTanque::Heading.new_from_degrees(0)
+  GO_RIGHT = RTanque::Heading.new_from_degrees(90)
+  GO_DOWN = RTanque::Heading.new_from_degrees(180)
+  GO_LEFT = RTanque::Heading.new_from_degrees(270)
+  
+  include RTanque::Bot::BrainHelper
 
   def initialize(whatever)
     @avoid_wall = 0
     @locked_heading = 0
-    @direction = 60
+    @direction = 90 ######## GO_RIGHT?
+    @dancing_adjustment = 0
 
+    # hax
     @hax = false
     @match = ObjectSpace.each_object(RTanque::Match).first if @hax
+
     super(whatever)
   end
 
   def tick!
     @desired_heading ||= nil
-    set_nearest_wall
+    find_nearest_wall
 
-    if (lock = self.get_radar_lock)
-      self.destroy_lock(lock)
+    @prey = find_prey ####### @@prey
+    if @prey
+      strike_prey
       @desired_heading = nil
     else
-      self.seek_lock
+      stalk_prey
     end
 
+    # hax
     whistle_for_help if alone?
   end
 
-  def destroy_lock(reflection)
+  def strike_prey
     if avoid_wall?
       move_away_from_wall
     else
-      heading = reflection.heading - RTanque::Heading.new_from_degrees(direction)
-      command.heading = reflection.distance > 250 ? heading : -heading
+      heading = RTanque::Heading.new_from_degrees(do_le_tango(@prey))
+      command.heading = @prey.distance > 250 ? heading : -heading
     end
 
-    command.radar_heading = reflection.heading
-    command.turret_heading = predict_target_position(reflection)
+    command.radar_heading = @prey.heading
+    command.turret_heading = predict_prey_position
     command.speed = MAX_BOT_SPEED
-    #if (reflection.heading.delta(sensors.turret_heading)).abs < TURRET_FIRE_RANGE
-      command.fire(reflection.distance > 300 ? MAX_FIRE_POWER : MAX_FIRE_POWER)
-    #end
+
+    command.fire(MAX_FIRE_POWER)
   end
 
-  def predict_target_position(target)
-    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 22.5
-    expected_target_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
-    RTanque::Heading.new_between_points(sensors.position, expected_target_position)
+  def predict_prey_position
+    speed_modifier_based_on_distance = sensors.position.distance(@prey.position) / 22.5
+    expected_position = @prey.position.move(@prey.direction, @prey.speed * speed_modifier_based_on_distance)
+    RTanque::Heading.new_between_points(sensors.position, expected_position)
   end
 
-  def seek_lock
+  def stalk_prey
     if avoid_wall?
       move_away_from_wall
     end
+
     command.radar_heading = sensors.radar_heading + MAX_RADAR_ROTATION
     command.speed = MAX_BOT_SPEED
+
     if @desired_heading
       command.heading = @desired_heading
       command.turret_heading = @desired_heading
     end
   end
 
-  def get_radar_lock
+  def find_prey
     sensors.radar.find { |reflection| reflection.type == :bot && reflection.name != NAME }
   end
 
-  def direction
-    #pry binding if sensors.radar.any? { |a| a.type == :shell && a.name != NAME }
-    if sensors.ticks % (rand(100)+100) == 0
-      @direction *= -1
-    end
 
-    @direction
+  def do_le_tango(reflection)
+    ( reflection.heading + RTanque::Heading.new_from_degrees(90) ) * direction
   end
 
-  GO_UP = RTanque::Heading.new_from_degrees(0)
-  GO_UP_AND_RIGHT = RTanque::Heading.new_from_degrees(45)
-  GO_RIGHT = RTanque::Heading.new_from_degrees(90)
-  GO_DOWN_AND_RIGHT = RTanque::Heading.new_from_degrees(135)
-  GO_DOWN = RTanque::Heading.new_from_degrees(180)
-  GO_DOWN_AND_LEFT = RTanque::Heading.new_from_degrees(225)
-  GO_LEFT = RTanque::Heading.new_from_degrees(270)
-  GO_UP_AND_LEFT = RTanque::Heading.new_from_degrees(315)
-
-  def avoid_wall?
-    @nearest_wall != :none
-  end
 
   def move_away_from_wall
     command.heading = GO_LEFT if @nearest_wall == :right
@@ -97,12 +91,7 @@ class Raptor < RTanque::Bot::Brain
     command.heading = GO_UP if @nearest_wall == :bottom
   end
 
-  def do_le_tango
-  end
-
-  # lets pretend we're in point.rb
-
-  def set_nearest_wall
+  def find_nearest_wall
     @nearest_wall = :none
     @nearest_wall = :bottom if sensors.position.y < ( sensors.position.arena.height * 0.2 )
     @nearest_wall = :top if sensors.position.y > ( sensors.position.arena.height * 0.8 )
@@ -110,8 +99,43 @@ class Raptor < RTanque::Bot::Brain
     @nearest_wall = :right if sensors.position.x > ( sensors.position.arena.width * 0.8 ) 
   end
 
+  def direction
+    at_tick_interval( rand(100)+100 ) { @direction *= -1 }
+
+    @direction
+  end
+
+  def move_away_from_raptor
+    command.heading = @nearby_raptor.heading - 180
+  end
+
+  def find_near_raptor
+    @nearby_raptor = sensors.radar.find { |possible_raptor|
+      raptor?(possible_raptor) && sensors.position.distance(possible_raptor.position) <= 200
+    }
+    @nearby_raptor
+  end
+
+  def raptor_in_way_of_prey?
+    sensors.radar.find { |possible_raptor| 
+      raptor?(possible_raptor) && in_line_of_fire?(possible_raptor)
+    }
+  end
+
+  def raptor?(raptor)
+    raptor.type == :bot && raptor.name == NAME
+  end
+
+  def in_line_of_fire?(prey)
+    prey.heading >= sensors.turret_heading - 15 || prey.heading <= sensors.turret_heading + 15
+  end
+
+  def avoid_wall?
+    @nearest_wall != :none
+  end
+
+  # hax
   def alone?
-    #@
     @hax && !@match.bots.any?{ |bot| bot.brain.respond_to?(:clever_girl?) && (bot.brain != self) }
   end
 
