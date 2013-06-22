@@ -13,7 +13,7 @@ class Raptor < RTanque::Bot::Brain
   def initialize(whatever)
     @avoid_wall = 0
     @locked_heading = 0
-    @direction = 90 ######## GO_RIGHT?
+    @direction = 90
     @dancing_adjustment = 0
 
     # hax
@@ -24,12 +24,10 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def tick!
-    puts "rap: #{object_id} tik: #{sensors.ticks} dir: #{@direction}"
-
     @desired_heading ||= nil
     find_nearest_wall
 
-    @prey = find_prey ####### @@prey
+    @prey = find_prey
     if @prey
       strike_prey
       @desired_heading = nil
@@ -102,8 +100,7 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def direction
-    interval = rand(50)+100
-    at_tick_interval( interval ) { @direction *= -1 }
+    at_tick_interval( rand(100)+100 ) { @direction *= -1 }
     @direction
   end
 
