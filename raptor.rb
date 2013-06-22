@@ -15,6 +15,7 @@ class Raptor < RTanque::Bot::Brain
     @locked_heading = 0
     @direction = 90
     @dancing_adjustment = 0
+    @firing_power = MAX_FIRE_POWER
 
     # hax
     @hax = false
@@ -43,21 +44,16 @@ class Raptor < RTanque::Bot::Brain
     if avoid_wall?
       move_away_from_wall
     else
-      heading = do_le_tango
-      command.heading = @prey.distance > 250 ? heading : -heading
+      command.heading = do_le_tango
     end
 
     command.radar_heading = @prey.heading
-    command.turret_heading = predict_prey_position
+    command.turret_heading = predict_target_position(@prey)
     command.speed = MAX_BOT_SPEED
 
-    command.fire(MAX_FIRE_POWER) unless raptor_in_the_way_of_prey?
-  end
-
-  def predict_prey_position
-    speed_modifier_based_on_distance = sensors.position.distance(@prey.position) / 22.5
-    expected_position = @prey.position.move(@prey.direction, @prey.speed * speed_modifier_based_on_distance)
-    RTanque::Heading.new_between_points(sensors.position, expected_position)
+    if facing_prey?
+      command.fire(@firing_power) unless raptor_in_the_way_of_prey?
+    end
   end
 
   def stalk_prey
@@ -65,7 +61,8 @@ class Raptor < RTanque::Bot::Brain
       move_away_from_wall
     end
 
-    command.radar_heading = sensors.radar_heading + MAX_RADAR_ROTATION
+    command.radar_heading = sensors.radar_heading - MAX_TURRET_ROTATION * (direction / direction.abs)
+    command.turret_heading = sensors.turret_heading - MAX_TURRET_ROTATION * (direction / direction.abs)
     command.speed = MAX_BOT_SPEED
 
     if @desired_heading
@@ -115,18 +112,30 @@ class Raptor < RTanque::Bot::Brain
     @nearby_raptor
   end
 
+  def predict_target_position(target)
+    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 22.5
+    expected_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
+    RTanque::Heading.new_between_points(sensors.position, expected_position)
+  end
+
   def raptor_in_the_way_of_prey?
     sensors.radar.find { |possible_raptor| 
       raptor?(possible_raptor) && in_line_of_fire?(possible_raptor)
     }
   end
 
+  def facing_prey?
+    in_line_of_fire? @prey
+  end
+
   def raptor?(raptor)
     raptor.type == :bot && raptor.name == NAME
   end
 
-  def in_line_of_fire?(prey)
-    prey.heading >= sensors.turret_heading - 15 || prey.heading <= sensors.turret_heading + 15
+  def in_line_of_fire?(target)
+    target_heading = predict_target_position(target)
+    target_heading >= sensors.turret_heading - RTanque::Heading.new_from_degrees(15) || 
+    target_heading <= sensors.turret_heading + RTanque::Heading.new_from_degrees(15)
   end
 
   def avoid_wall?
