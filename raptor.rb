@@ -41,13 +41,14 @@ class Raptor < RTanque::Bot::Brain
     command.radar_heading = reflection.heading
     command.turret_heading = predict_target_position(reflection)
     command.speed = MAX_BOT_SPEED
-    if (reflection.heading.delta(sensors.turret_heading)).abs < TURRET_FIRE_RANGE
-      command.fire(reflection.distance > 200 ? MAX_FIRE_POWER : MIN_FIRE_POWER)
-    end
+    #if (reflection.heading.delta(sensors.turret_heading)).abs < TURRET_FIRE_RANGE
+      command.fire(reflection.distance > 300 ? MAX_FIRE_POWER : MAX_FIRE_POWER)
+    #end
   end
 
   def predict_target_position(target)
-    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 10
+    puts 
+    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 22.5
     expected_target_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
     RTanque::Heading.new_between_points(sensors.position, expected_target_position)
   end
