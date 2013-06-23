@@ -1,4 +1,5 @@
 require 'pry'
+
 class Raptor < RTanque::Bot::Brain
   NAME = 'CleverGirl'
   COLOR = :green
@@ -10,28 +11,32 @@ class Raptor < RTanque::Bot::Brain
   
   include RTanque::Bot::BrainHelper
 
-  def initialize(whatever)
+  def initialize(*)
+    super 
     @avoid_wall = 0
     @locked_heading = 0
     @direction = 90
     @dancing_adjustment = 0
-    @firing_power = MAX_FIRE_POWER
+    @firing_power_factor = 1
+
+    @id = self.class.pack.count
+    self.class.pack << self
 
     # hax
     @hax = false
     @match = ObjectSpace.each_object(RTanque::Match).first if @hax
+  end
 
-    super(whatever)
+  def self.pack
+    @pack ||= []
   end
 
   def tick!
-    @desired_heading ||= nil
     find_nearest_wall
 
     @prey = find_prey
     if @prey
       strike_prey
-      @desired_heading = nil
     else
       stalk_prey
     end
@@ -52,7 +57,11 @@ class Raptor < RTanque::Bot::Brain
     command.speed = MAX_BOT_SPEED
 
     if facing_prey?
-      command.fire(@firing_power) unless raptor_in_the_way_of_prey?
+      if raptor_in_the_way_of_prey? && sensors.gun_energy == RTanque::Bot::MAX_GUN_ENERGY
+        abandon_hunt
+      else
+        command.fire(MAX_FIRE_POWER / @firing_power_factor) 
+      end
     end
   end
 
@@ -61,18 +70,19 @@ class Raptor < RTanque::Bot::Brain
       move_away_from_wall
     end
 
-    command.radar_heading = sensors.radar_heading - MAX_TURRET_ROTATION * (direction / direction.abs)
-    command.turret_heading = sensors.turret_heading - MAX_TURRET_ROTATION * (direction / direction.abs)
+    command.radar_heading = sensors.radar_heading - MAX_TURRET_ROTATION
+    command.turret_heading = sensors.turret_heading - MAX_TURRET_ROTATION
     command.speed = MAX_BOT_SPEED
-
-    if @desired_heading
-      command.heading = @desired_heading
-      command.turret_heading = @desired_heading
-    end
   end
 
   def find_prey
     sensors.radar.find { |reflection| reflection.type == :bot && reflection.name != NAME }
+  end
+
+  def abandon_hunt
+    @prey = nil
+    command.radar_heading = sensors.radar_heading - direction
+    command.turret_heading = sensors.turret_heading - direction
   end
 
 
@@ -113,7 +123,7 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def predict_target_position(target)
-    speed_modifier_based_on_distance = sensors.position.distance(target.position) / 22.5
+    speed_modifier_based_on_distance = sensors.position.distance(target.position) / (22.5 * @firing_power_factor)
     expected_position = target.position.move(target.direction, target.speed * speed_modifier_based_on_distance)
     RTanque::Heading.new_between_points(sensors.position, expected_position)
   end
