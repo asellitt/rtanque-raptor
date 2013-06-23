@@ -32,14 +32,25 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def tick!
+    @prey = nil
     find_nearest_wall
-
-    @prey = find_prey
+    
+    #@prey = find_prey
+    if alpha?
+      @prey = find_prey
+    elsif alpha.nil?
+      @prey = find_prey 
+    else
+      @prey = alpha.prey
+    end
+    
     if @prey
       strike_prey
     else
       stalk_prey
     end
+
+    @prey = nil
 
     # hax
     whistle_for_help if alone?
@@ -52,7 +63,12 @@ class Raptor < RTanque::Bot::Brain
       command.heading = do_le_tango
     end
 
-    command.radar_heading = @prey.heading
+    if alpha?
+      command.radar_heading = @prey.heading
+    else
+      command.radar_heading = sensors.radar_heading - MAX_TURRET_ROTATION
+    end
+
     command.turret_heading = predict_target_position(@prey)
     command.speed = MAX_BOT_SPEED
 
@@ -60,7 +76,7 @@ class Raptor < RTanque::Bot::Brain
       if raptor_in_the_way_of_prey? && sensors.gun_energy == RTanque::Bot::MAX_GUN_ENERGY
         abandon_hunt
       else
-        command.fire(MAX_FIRE_POWER / @firing_power_factor) 
+        command.fire(MAX_FIRE_POWER / @firing_power_factor) if prey_alive?
       end
     end
   end
@@ -77,6 +93,14 @@ class Raptor < RTanque::Bot::Brain
 
   def find_prey
     sensors.radar.find { |reflection| reflection.type == :bot && reflection.name != NAME }
+  end
+
+  def alpha
+    self.class.pack.find{ |raptor| raptor.stalking_prey? }
+  end
+
+  def prey
+    @prey
   end
 
   def abandon_hunt
@@ -134,12 +158,24 @@ class Raptor < RTanque::Bot::Brain
     }
   end
 
+  def prey_alive?
+    !find_prey.nil?
+  end
+
   def facing_prey?
     in_line_of_fire? @prey
   end
 
+  def stalking_prey?
+    !@prey.nil?
+  end
+
   def raptor?(raptor)
     raptor.type == :bot && raptor.name == NAME
+  end
+
+  def alpha?
+    alpha == self unless alpha.nil?
   end
 
   def in_line_of_fire?(target)
@@ -163,5 +199,9 @@ class Raptor < RTanque::Bot::Brain
 
   def clever_girl?
     true
+  end
+
+  def print(something)
+    puts "RAPTOR:#{@id} alpha:#{alpha?} --- #{something}"
   end
 end
