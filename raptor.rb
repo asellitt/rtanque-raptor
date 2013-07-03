@@ -23,7 +23,7 @@ class Raptor < RTanque::Bot::Brain
     self.class.pack << self
 
     # hax
-    @hax = false
+    @hax = true
     @match = ObjectSpace.each_object(RTanque::Match).first if @hax
   end
 
@@ -194,7 +194,9 @@ class Raptor < RTanque::Bot::Brain
   end
 
   def whistle_for_help
-    @match.add_bots(RTanque::Bot.new_random_location(@match.arena, self.class)) if @hax
+    at_tick_interval(rand(200) + 200) do
+      @match.add_bots(RTanque::Bot.new_random_location(@match.arena, self.class)) if @hax
+    end
   end
 
   def clever_girl?
