@@ -1,6 +1,6 @@
 rtanque-raptor
 ==============
 
-My rtanque bot
+My rtanque bot.
 
-This is something I was working on during Rails Camp 2013.
+This came out of the pairing work I did with @lukearndt during Rails Camp 2013.
